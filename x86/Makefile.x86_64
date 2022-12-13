@@ -47,6 +47,7 @@ tests += $(TEST_DIR)/access_test.$(exe)
 tests += $(TEST_DIR)/svm.$(exe)
 tests += $(TEST_DIR)/svm_npt.$(exe)
 tests += $(TEST_DIR)/vmx.$(exe)
+tests += $(TEST_DIR)/vmx_demo.$(exe)
 endif
 
 ifneq ($(fcf_protection_full),)
