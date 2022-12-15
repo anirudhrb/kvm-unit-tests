@@ -285,6 +285,7 @@ int init_vmcs(struct vmcs **vmcs)
 static void __attribute__((__used__)) guest_main(void)
 {
 	printf("Hello from guest!\n");
+	asm("mov %cr3,%rax\n\t");
 }
 
 /* guest_entry */
@@ -335,6 +336,7 @@ int main(int argc, const char *argv[])
 {
 	struct vmcs *vmcs;
 	struct vmentry_result result;
+	u64 val, guest_rip, insn_len;
 
 	setup_vm();
 	init_bsp_vmx();
@@ -348,7 +350,32 @@ int main(int argc, const char *argv[])
 	vmx_on();
 
 	init_vmcs(&vmcs);
+
+	val = vmcs_read(CPU_EXEC_CTRL0);
+	vmcs_write(CPU_EXEC_CTRL0, val | CPU_CR3_STORE);
+
 	vmx_enter_guest(&result);
+
+	if (result.entered)
+		launched = true;
+
+	if (result.exit_reason.full == VMX_CR) {
+		printf("VM exit due to CR3 load/store\n");
+
+		insn_len = vmcs_read(EXI_INST_LEN);
+		guest_rip = vmcs_read(GUEST_RIP);
+		vmcs_write(GUEST_RIP, guest_rip + insn_len);
+
+		printf("Resuming guest\n");
+		vmx_enter_guest(&result);
+		if (result.exit_reason.full == VMX_VMCALL)
+			printf("VM exit due to VMCALL\n");
+	} else if (result.exit_reason.full == VMX_VMCALL) {
+		printf("VM exit due to VMCALL\n");
+	} else {
+		printf("VM entry failed? %u\n", result.vm_fail);
+		printf("Unexpected VM exit reason: %u\n", result.exit_reason.full);
+	}
 
 	vmx_off();
 	printf("VMXOFF\n");
